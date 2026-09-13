@@ -1,0 +1,42 @@
+@startuml c4_2_container
+!include <C4/C4_Container>
+
+title Оцифровка документов кредитной заявки — контейнеры
+
+LAYOUT_TOP_DOWN()
+skinparam wrapWidth 180
+skinparam maxMessageSize 80
+
+AddRelTag("trust", $textColor="FireBrick", $lineColor="FireBrick", $lineStyle=DashedLine(), $legendText="Граница доверия")
+
+Person(client, "Клиент / заёмщик", "Присылает скан, фото, Excel, выгрузку")
+Person(underwriter, "Андеррайтер", "Подтверждает критичные поля и решает по кредиту")
+
+System_Boundary(bank, "Банк") {
+    Container(pipeline, "Кредитный конвейер", "Существующая система", "Заявка и статус")
+    Container(intake, "Приём документов", "Обычный код", "Маршрутизация по типу файла")
+    Container(ocr, "Чтение документа", "Модель и код", "Скан распознаём моделью, Excel читает код")
+    Container(extract, "Сервис извлечения полей", "Модель", "Поля, тип документа, ссылка на место в файле")
+    Container(validator, "Валидатор контракта и сверки", "Обычный код", "Схема, суммы, противоречия в пакете")
+    Container(card, "Карточка заявки", "Существующая система", "Предзаполнение. Кредит решает человек")
+    Container(journal, "Журнал извлечений и правок", "Хранилище", "Поля, фрагмент, правка андеррайтера")
+}
+
+Rel(client, intake, "файл заявки", $tags="trust")
+Rel(pipeline, intake, "идентификатор заявки")
+Rel(intake, ocr, "файл")
+Rel(ocr, extract, "текст и страницы")
+Rel(extract, validator, "извлечённые поля", $tags="trust")
+Rel(validator, card, "проверенные поля")
+Rel(underwriter, card, "подтверждает и решает")
+Rel(validator, journal, "что не сошлось")
+Rel(card, journal, "правка человека")
+
+Lay_D(intake, ocr)
+Lay_D(ocr, extract)
+Lay_D(extract, validator)
+Lay_D(validator, card)
+Lay_D(card, journal)
+
+SHOW_LEGEND()
+@enduml

@@ -1,0 +1,57 @@
+@startuml c4_1_container
+!include <C4/C4_Container>
+
+title Приоритизация очереди финмониторинга — контейнеры
+
+LAYOUT_LEFT_RIGHT()
+skinparam wrapWidth 180
+skinparam maxMessageSize 80
+
+AddRelTag("trust", $textColor="FireBrick", $lineColor="FireBrick", $lineStyle=DashedLine(), $legendText="Граница доверия")
+
+Person(officer, "Сотрудник финмониторинга", "Разбирает, эскалирует, отказывает, снимает пометку")
+Person(lead, "Руководитель финмониторинга", "Владелец очереди и риска режима")
+
+System_Ext(kyc, "Платформа «Знай своего клиента»", "Вспомогательный сигнал")
+
+System_Boundary(bank, "Банк") {
+    Container(abs, "АБС / операционный журнал", "Существующая система", "Операции по счетам и назначение платежа")
+    ContainerQueue(bus, "Шина событий", "Kafka", "Операции читаются микробатчами, доставка не реже одного раза")
+    Container(rules, "Движок пороговых правил AML", "Правила", "Помечает операции независимо от модели")
+    Container(features, "Сборщик признаков", "Обычный код", "Агрегаты за окно и слова из назначения платежа")
+    Container(model, "Сервис модели", "Модель", "Оценка подозрительности, не вердикт")
+    Container(prio, "Сервис приоритизации очереди", "Обычный код", "Калибровка, валидатор контракта, маршрутизация, сортировка")
+    Container(queue, "Очередь и рабочее место", "Существующая система", "Та же очередь разбора, что сейчас")
+    Container(sample, "Сборщик контрольной выборки", "Обычный код", "Случайная выборка из всего потока")
+    Container(journal, "Журнал оценок и решений", "Хранилище", "Версия модели, оценка, действие человека")
+    Container(monitor, "Мониторинг", "Сервис", "Вход, модель, очередь, бизнес-метрика")
+}
+
+Rel(abs, bus, "событие об операции", $tags="trust")
+Rel(bus, features, "микробатч операций")
+Rel(features, prio, "вектор признаков")
+Rel(prio, model, "запрос оценки")
+Rel(model, prio, "оценка и факторы", $tags="trust")
+Rel(prio, queue, "валидный приоритет")
+
+Rel(abs, rules, "операции")
+Rel(kyc, rules, "сигнал")
+Rel(rules, queue, "пометки")
+
+Rel(bus, sample, "весь поток")
+Rel(sample, queue, "карточки на слепую разметку")
+
+Rel(officer, queue, "разбирает")
+Rel(lead, queue, "владеет сроком")
+
+Rel(prio, journal, "версия, оценка, причина фолбэка")
+Rel(queue, journal, "решение человека")
+Rel(journal, monitor, "записи для разбора")
+
+Lay_R(abs, bus)
+Lay_R(bus, features)
+Lay_R(features, prio)
+Lay_R(prio, queue)
+
+SHOW_LEGEND()
+@enduml

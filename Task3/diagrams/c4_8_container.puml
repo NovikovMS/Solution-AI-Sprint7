@@ -1,0 +1,38 @@
+@startuml c4_8_container
+!include <C4/C4_Container>
+
+title Предсказание оттока — контейнеры
+
+LAYOUT_TOP_DOWN()
+skinparam wrapWidth 180
+skinparam maxMessageSize 80
+
+AddRelTag("trust", $textColor="FireBrick", $lineColor="FireBrick", $lineStyle=DashedLine(), $legendText="Граница доверия: ответ модели")
+
+Person(manager, "Персональный менеджер", "Звонит, предлагает, фиксирует исход")
+
+System_Boundary(bank, "Банк") {
+    Container(abs, "АБС", "Существующая система", "Обороты и операции")
+    Container(crm, "CRM", "Существующая система", "Жалобы, тариф, приостановки")
+    Container(features, "Сборщик агрегатов", "Обычный код", "Признаки за окно, без факта «уже ушёл»")
+    Container(model, "Сервис оценки оттока", "Модель", "Вероятность ухода на горизонте")
+    Container(validator, "Валидатор контракта", "Обычный код", "Диапазон, активный клиент, схема")
+    Container(list, "Список на удержание", "Сервис", "Порядок обзвона. Письмо само не уходит")
+    Container(journal, "Журнал оценок и контактов", "Хранилище", "Вероятность, факторы, факт контакта")
+}
+
+Rel(abs, features, "агрегаты оборотов")
+Rel(crm, features, "жалобы, тариф, приостановки")
+Rel(features, model, "вектор признаков")
+Rel(model, validator, "вероятность и факторы", $tags="trust")
+Rel(validator, list, "валидный порядок")
+Rel(manager, list, "берёт контакты")
+Rel(list, journal, "контакт или отказ от контакта")
+
+Lay_D(features, model)
+Lay_D(model, validator)
+Lay_D(validator, list)
+Lay_D(list, journal)
+
+SHOW_LEGEND()
+@enduml

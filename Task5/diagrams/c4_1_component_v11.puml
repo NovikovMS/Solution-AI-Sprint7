@@ -1,0 +1,68 @@
+@startuml c4_1_component_v11
+!include <C4/C4_Component>
+
+title Сервис приоритизации очереди после инцидента (v1.1) — компоненты
+
+LAYOUT_TOP_DOWN()
+skinparam wrapWidth 180
+skinparam maxMessageSize 80
+
+AddElementTag("new", $bgColor="#1B7F4B", $fontColor="#FFFFFF", $borderColor="#0F4F2E", $legendText="Добавлено после инцидента")
+AddElementTag("changed", $bgColor="#B8860B", $fontColor="#FFFFFF", $borderColor="#7A5A07", $legendText="Изменено после инцидента")
+
+AddRelTag("trust", $textColor="FireBrick", $lineColor="FireBrick", $lineStyle=DashedLine(), $legendText="Граница доверия: ответ модели")
+AddRelTag("fail", $textColor="#666666", $lineColor="#666666", $lineStyle=DashedLine(), $legendText="Карантин, фолбэк или сломанный контракт")
+
+Container_Ext(bus, "Шина событий", "Операции микробатчами")
+Container_Ext(featsvc, "Сборщик признаков", "Агрегаты и слова из назначения платежа")
+Container_Ext(modelsvc, "Сервис модели", "Оценка подозрительности")
+Container_Ext(config, "Конфигурация", "Версия модели, состояния групп: карантин, тень, боевой")
+Container_Ext(workplace, "Очередь и рабочее место", "Карточка операции")
+Container_Ext(journal, "Журнал оценок и решений", "Версия, снимок признаков, группа, решение")
+Container_Ext(mon, "Мониторинг", "Сигналы с числовыми порогами по группам")
+
+Container_Boundary(svc, "Сервис приоритизации очереди") {
+    Component(pack, "Приём микробатча", "Код", "Читает смещение, проверяет идемпотентность: операция + версия + снимок признаков")
+    Component(group, "Классификатор группы", "Код", "Относит операцию к группе по ОКВЭД, профилю контрагентов, возрасту клиента, профилю сумм и частот", $tags="new")
+    Component(ood, "Детектор новизны", "Код", "Расстояние вектора признаков до обучающего распределения. Незнакомый вход не доходит до модели", $tags="new")
+    Component(client, "Клиент модели", "Код", "Отдельный компонент: своя версия, таймаут и лимиты")
+    Component(calib, "Калибровка и зона воздержания", "Код", "Рабочая шкала, пороги с финмониторингом")
+    Component(validator, "Валидатор контракта", "Код", "Схема, диапазон, обязательные поля, запрет полей из будущего")
+    Component(route, "Маршрутизатор", "Код", "Писать оценку или оставить порядок правил. Теперь сверяется с состоянием группы: карантин — оценку не пишем", $tags="changed")
+    Component(rank, "Обновление порядка очереди", "Код", "Сортировка. Пометки правил не затирает")
+}
+
+Rel(bus, pack, "микробатч операций")
+Rel(featsvc, pack, "вектор признаков")
+Rel(pack, group, "операции с признаками")
+Rel(config, group, "состояния групп")
+Rel(group, ood, "операция и её группа")
+Rel(ood, client, "группа в боевом или теневом режиме")
+Rel(ood, route, "карантин или вход вне обучающего распределения", $tags="fail")
+Rel(client, modelsvc, "запрос оценки")
+Rel(modelsvc, calib, "оценка и факторы", $tags="trust")
+Rel(calib, validator, "оценка на шкале")
+Rel(validator, route, "контракт сошёлся")
+Rel(validator, route, "контракт сломан", $tags="fail")
+Rel(config, route, "состояние группы")
+Rel(route, rank, "есть оценка, группа в боевом режиме")
+Rel(route, rank, "карантин, тень, фолбэк: порядок правил", $tags="fail")
+Rel(rank, workplace, "порядок очереди")
+
+Rel(group, mon, "доля незнакомых ОКВЭД и контрагентов")
+Rel(ood, mon, "доля операций вне обучающего распределения")
+Rel(rank, mon, "состав top-N по группам")
+Rel(route, journal, "группа, состояние, причина фолбэка")
+Rel(validator, journal, "результат проверки")
+Rel(workplace, journal, "решение человека")
+
+Lay_D(pack, group)
+Lay_D(group, ood)
+Lay_D(ood, client)
+Lay_D(client, calib)
+Lay_D(calib, validator)
+Lay_D(validator, route)
+Lay_D(route, rank)
+
+SHOW_LEGEND()
+@enduml
